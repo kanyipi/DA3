@@ -1,0 +1,29 @@
+---
+title: "DA3 Exercise1"
+author: "Peter Kaiser"
+date: '2022 01 23 '
+output: pdf_document
+---
+
+
+
+```{r}
+# setup and import
+library(tidyverse)
+
+df <- read_csv('https://osf.io/4ay9x/download')
+
+#str(df)
+#summary(df)
+```
+
+```{r}
+# select columns
+
+df <- df %>% select(occ2012,earnwke,uhours,grade92,race,age,sex,state,unionmme)
+
+
+na_count <- sum(is.na(df))
+
+df <- df %>% filter(occ2012==9120 | occ2012==9130 | occ2012==9140)
+```
