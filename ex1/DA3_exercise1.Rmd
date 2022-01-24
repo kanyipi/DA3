@@ -5,40 +5,30 @@ date: '2022 01 23 '
 output: pdf_document
 ---
 
+#Introduction
 
 
-```{r, echo=FALSE}
-# setup and import
 
-# TODO
-# this filter grade92>=43 and state variable
-# introduction
-# data munging
-# models
-# appendix
+```{r, echo=FALSE, message=FALSE}
+# setup and data import
 
 library(tidyverse)
 library(fixest)
 library(caret)
 library(knitr)
-
+library(kableExtra)
 
 df_all <- read_csv("https://osf.io/4ay9x/download")
-
-# str(df)
-# summary(df)
 ```
 
 ```{r, echo=FALSE}
 # select predictor columns
-
 df <- df_all %>% select(occ2012, earnwke, uhours, grade92, race, age, sex, marital, unionmme)
 
 # counting NA fields
 na_count <- sum(is.na(df))
 
 # filtering for driving occupation and the filters we applied in class
-
 df <- df %>% filter(occ2012 == 9120 | occ2012 == 9130 | occ2012 == 9140)
 
 df <- df %>% filter(uhours >= 20, earnwke > 0, age >= 24, age <= 64)
@@ -51,78 +41,86 @@ post_count <- df %>% nrow()
 
 filtered <- pre_count - post_count
 
-#Data munging
-
+## Data munging
+# hourly wage
 df <- df %>% mutate(earnho = earnwke / uhours)
 
-df <- df %>% mutate(e_highschoolf = ifelse(grade92==39,1,0))
-df <- df %>% mutate(e_collegedrop = ifelse(grade92==40,1,0))
-df <- df %>% mutate(e_occupationdegree = ifelse(grade92==41,1,0))
-df <- df %>% mutate(e_academicdegree = ifelse(grade92==42,1,0))
+# education
+df <- df %>% mutate(e_highschoolf = ifelse(grade92 == 39, 1, 0))
+df <- df %>% mutate(e_collegedrop = ifelse(grade92 == 40, 1, 0))
+df <- df %>% mutate(e_occupationdegree = ifelse(grade92 == 41, 1, 0))
+df <- df %>% mutate(e_academicdegree = ifelse(grade92 == 42, 1, 0))
 
-df <- df %>% mutate(r_white = ifelse(race==1,1,0))
-df <- df %>% mutate(r_blackf = ifelse(race==2,1,0))
-df <- df %>% mutate(r_asianf = ifelse(race==4,1,0))
-df <- df %>% mutate(r_otherf = ifelse(race!=1
-                                      & race!=2
-                                      & race!=4,1,0))
+df <- df %>% mutate(r_white = ifelse(race == 1, 1, 0))
+df <- df %>% mutate(r_blackf = ifelse(race == 2, 1, 0))
+df <- df %>% mutate(r_asianf = ifelse(race == 4, 1, 0))
+df <- df %>% mutate(r_otherf = ifelse(race != 1 &
+  race != 2 &
+  race != 4, 1, 0))
 
-df <- df %>% mutate(s_malef = ifelse(sex==1,1,0))
-df <- df %>% mutate(s_femalef = ifelse(sex==2,1,0))
+# sex
+df <- df %>% mutate(s_malef = ifelse(sex == 1, 1, 0))
+df <- df %>% mutate(s_femalef = ifelse(sex == 2, 1, 0))
 
-df <- df %>% mutate(m_marriedf = ifelse(marital==1,1,0))
-df <- df %>% mutate(m_divorcedf = ifelse(marital==5,1,0))
-df <- df %>% mutate(m_nevermarriedf = ifelse(marital==7,1,0))
-df <- df %>% mutate(m_otherf = ifelse(marital==3
-                                      | marital==4 
-                                      | marital==6,1,0))
+# marital
+df <- df %>% mutate(m_marriedf = ifelse(marital == 1, 1, 0))
+df <- df %>% mutate(m_divorcedf = ifelse(marital == 5, 1, 0))
+df <- df %>% mutate(m_nevermarriedf = ifelse(marital == 7, 1, 0))
+df <- df %>% mutate(m_otherf = ifelse(marital == 3 |
+  marital == 4 |
+  marital == 6, 1, 0))
 
-df <- df %>% mutate(u_yesf=ifelse(unionmme=="Yes",1,0))
-df <- df %>% mutate(u_nof=ifelse(unionmme=="No",1,0))
+# union
+df <- df %>% mutate(u_yesf = ifelse(unionmme == "Yes", 1, 0))
+df <- df %>% mutate(u_nof = ifelse(unionmme == "No", 1, 0))
 
+# higher power
 df <- df %>% mutate(agesq = age^2, agecu = age^3)
-
 ```
 
 * Target Variable (Y): Hourly wage
 * Predictor variables (X): Education (High school graduate as base), Race (White as base), Age, Sex (Male as base), Marital Status (Married as base), Union Status (Not in union as base)
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE}
+
+# creating models
+
+# Model 1: linear regression on age
 model1 <- as.formula(earnho ~ age + agesq)
 
+# Models 2-5: Multiple linear regressions
 model2 <- as.formula(earnho ~ age + agesq + s_femalef)
 
-model3 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf 
-                     + m_nevermarriedf + m_otherf)
+model3 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf
+  + m_nevermarriedf + m_otherf)
 
-model4 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf 
-                     + m_nevermarriedf + m_otherf + r_blackf + r_asianf
-                     + r_otherf + e_collegedrop + e_occupationdegree 
-                     + e_academicdegree)
+model4 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf
+  + m_nevermarriedf + m_otherf + r_blackf + r_asianf
+  + r_otherf + e_collegedrop + e_occupationdegree
+  + e_academicdegree)
 
 model5 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf
-                     + m_nevermarriedf + m_otherf + r_blackf + r_asianf
-                     + r_otherf + e_collegedrop + e_occupationdegree 
-                     + e_academicdegree + agecu + age*s_femalef + age*u_yesf)
+  + m_nevermarriedf + m_otherf + r_blackf + r_asianf
+  + r_otherf + e_collegedrop + e_occupationdegree
+  + e_academicdegree + agecu + age * s_femalef + age * u_yesf)
 
-reg1 <- feols(model1, data=df, vcov = 'hetero')
-reg2 <- feols(model2, data=df, vcov = 'hetero')
-reg3 <- feols(model3, data=df, vcov = 'hetero')
-reg4 <- feols(model4, data=df, vcov = 'hetero')
-reg5 <- feols(model5, data=df, vcov = 'hetero')
-
+# Running simple OLS
+reg1 <- feols(model1, data = df, vcov = "hetero")
+reg2 <- feols(model2, data = df, vcov = "hetero")
+reg3 <- feols(model3, data = df, vcov = "hetero")
+reg4 <- feols(model4, data = df, vcov = "hetero")
+reg5 <- feols(model5, data = df, vcov = "hetero")
 ```
+
 ```{r, echo=FALSE}
+
+# cross fold validation
+
+# number of folds
 k <- 4
 
 set.seed(1)
 cv1 <- train(model1, df, method = "lm", trControl = trainControl(method = "cv", number = k))
-
-cv1
-summary(cv1)
-cv1$results
-cv1$resample
-
 set.seed(1)
 cv2 <- train(model2, df, method = "lm", trControl = trainControl(method = "cv", number = k))
 set.seed(1)
@@ -134,50 +132,56 @@ cv5 <- train(model5, df, method = "lm", trControl = trainControl(method = "cv", 
 ```
 
 ```{r, echo=FALSE}
+
+# Calculate RMSE for each fold and the average RMSE as well
 cv <- c("cv1", "cv2", "cv3", "cv4", "cv5")
 rmse_cv <- c()
 
-for(i in 1:length(cv)){
+for (i in 1:length(cv)) {
   rmse_cv[i] <- sqrt((get(cv[i])$resample[[1]][1]^2 +
-                       get(cv[i])$resample[[1]][2]^2 +
-                       get(cv[i])$resample[[1]][3]^2 +
-                       get(cv[i])$resample[[1]][4]^2)/4)
+    get(cv[i])$resample[[1]][2]^2 +
+    get(cv[i])$resample[[1]][3]^2 +
+    get(cv[i])$resample[[1]][4]^2) / 4)
 }
 
 
 # summarize results
-cv_mat <- data.frame(rbind(cv1$resample[4], "Average"),
-           rbind(cv1$resample[1], rmse_cv[1]),
-           rbind(cv2$resample[1], rmse_cv[2]),
-           rbind(cv3$resample[1], rmse_cv[3]),
-           rbind(cv4$resample[1], rmse_cv[4]),
-           rbind(cv5$resample[1], rmse_cv[5])
-           )
+cv_mat <- data.frame(
+  rbind(cv1$resample[4], "Average"),
+  rbind(cv1$resample[1], rmse_cv[1]),
+  rbind(cv2$resample[1], rmse_cv[2]),
+  rbind(cv3$resample[1], rmse_cv[3]),
+  rbind(cv4$resample[1], rmse_cv[4]),
+  rbind(cv5$resample[1], rmse_cv[5])
+)
 
-colnames(cv_mat)<-c("Resample","Model1", "Model2", "Model3", "Model4", "Model5")
-cv_mat
 
 m_comp <- c()
 models <- c("reg1", "reg2", "reg3", "reg4", "reg5")
-for( i in 1 : length(cv) ){
-  m_comp[ i ] <- length( get( models[i] )$coefficient  - 1 ) 
+for (i in 1:length(cv)) {
+  m_comp[i] <- length(get(models[i])$coefficient - 1)
 }
 
-m_comp <- tibble( model = models , 
-                  complexity = m_comp,
-                  RMSE = rmse_cv )
+m_comp <- tibble(
+  model = models,
+  complexity = m_comp,
+  RMSE = rmse_cv
+)
 
-ggplot( m_comp , aes( x = complexity , y = RMSE ) ) +
-  geom_point(color='red',size=2) +
-  geom_line(color='blue',size=0.5)+
-  labs(x='Number of explanatory variables',y='Averaged RMSE on test samples',
-       title='Prediction performance and model compexity') +
+ggplot(m_comp, aes(x = complexity, y = RMSE)) +
+  geom_point(color = "red", size = 2) +
+  geom_line(color = "blue", size = 0.5) +
+  labs(
+    x = "Number of explanatory variables", y = "Averaged RMSE on test samples",
+    title = "Prediction performance and model compexity"
+  ) +
   theme_bw()
 ```
+# Appendix
 
 
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
-```{r, echo=FALSE}
 ggplot(df, aes(earnho)) +
   geom_histogram() +
   theme_bw() +
@@ -197,40 +201,56 @@ ggplot(df, aes(grade92)) +
   geom_histogram(stat = "count") +
   theme_bw() +
   labs(title = "Histogram of the Education Levels", x = "", y = "")
+```
 
-```
 ```{r, echo=FALSE}
-cv_mat %>% kable()
+
+# cross fold table
+cv_mat %>%
+  kable(booktabs = TRUE) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"))
 ```
+
 With 5-fold cross validation Model 3 has the best RMSE 
 
 \newpage
 
 # Evaluation of the models using all the sample
 ```{r, echo=FALSE}
-varname_report <- c("(Intercept)" = "Intercept",
-                   "agesq" = "age squared",
-                   "s_femalef" = "female",
-                   "u_yesf" = "unionized",
-                   "m_divorcedf" = "divorced",
-                   "m_nevermarriedf" = "never married",
-                   "m_otherf" = "other marital status",
-                   "r_blackf" = "black",
-                   "r_asianf" = "asian",
-                   "r_otherf" = "other race",
-                   "e_collegedrop" = "college drop-out",
-                   "e_occupationdegree" = "occupational degree",
-                   "e_academicdegree" = "academic degree",
-                   "agecu" = "age cubed",
-                   "m_otherf" = "other marital status",
-                   "age x s_femalef" = "age x female",
-                   "age x u_yesf" = "age x unionized")
-fitstat_register("k", function(x){length( x$coefficients ) - 1}, "No. Variables")
-etable( reg1 , reg2 , reg3 , reg4 , reg5 ,
-        fitstat = c('aic','bic','rmse','r2','n','k'),
-        title = "Model Evaluation",
-        se.below = T,
-        dict = varname_report
-        )%>% kable()
+
+# coeff table
+varname_report <- c(
+  "(Intercept)" = "Intercept",
+  "agesq" = "age squared",
+  "s_femalef" = "female",
+  "u_yesf" = "unionized",
+  "m_divorcedf" = "divorced",
+  "m_nevermarriedf" = "never married",
+  "m_otherf" = "other marital status",
+  "r_blackf" = "black",
+  "r_asianf" = "asian",
+  "r_otherf" = "other race",
+  "e_collegedrop" = "college drop-out",
+  "e_occupationdegree" = "occupational degree",
+  "e_academicdegree" = "academic degree",
+  "agecu" = "age cubed",
+  "m_otherf" = "other marital status",
+  "age x s_femalef" = "age x female",
+  "age x u_yesf" = "age x unionized"
+)
+
+fitstat_register("k", function(x) {
+  length(x$coefficients) - 1
+}, "No. Variables")
+
+etable(reg1, reg2, reg3, reg4, reg5,
+  fitstat = c("aic", "bic", "rmse", "r2", "n", "k"),
+  title = "Model Evaluation",
+  se.below = T,
+  dict = varname_report
+) %>%
+  kable(booktabs = TRUE) %>%
+  kable_styling(latex_options = c("hold_position", "scale_down"))
 ```
+
 According to BIC, Model 3 is the best. According to RMSE Model 5 is the best.
