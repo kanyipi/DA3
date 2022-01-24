@@ -7,23 +7,203 @@ output: pdf_document
 
 
 
-```{r}
+```{r, echo=FALSE}
 # setup and import
+
+# TODO
+# this filter grade92>=43 and state variable
+# introduction
+# data munging
+# models
+# appendix
+
 library(tidyverse)
+library(fixest)
+library(caret)
+library(knitr)
 
-df <- read_csv('https://osf.io/4ay9x/download')
 
-#str(df)
-#summary(df)
+df_all <- read_csv("https://osf.io/4ay9x/download")
+
+# str(df)
+# summary(df)
 ```
 
-```{r}
-# select columns
+```{r, echo=FALSE}
+# select predictor columns
 
-df <- df %>% select(occ2012,earnwke,uhours,grade92,race,age,sex,state,unionmme)
+df <- df_all %>% select(occ2012, earnwke, uhours, grade92, race, age, sex, marital, unionmme)
 
-
+# counting NA fields
 na_count <- sum(is.na(df))
 
-df <- df %>% filter(occ2012==9120 | occ2012==9130 | occ2012==9140)
+# filtering for driving occupation and the filters we applied in class
+
+df <- df %>% filter(occ2012 == 9120 | occ2012 == 9130 | occ2012 == 9140)
+
+df <- df %>% filter(uhours >= 20, earnwke > 0, age >= 24, age <= 64)
+
+pre_count <- df %>% nrow()
+
+df <- df %>% filter(grade92 >= 39, grade92 < 43)
+
+post_count <- df %>% nrow()
+
+filtered <- pre_count - post_count
+
+#Data munging
+
+df <- df %>% mutate(earnho = earnwke / uhours)
+
+df <- df %>% mutate(e_highschoolf = ifelse(grade92==39,1,0))
+df <- df %>% mutate(e_collegedrop = ifelse(grade92==40,1,0))
+df <- df %>% mutate(e_occupationdegree = ifelse(grade92==41,1,0))
+df <- df %>% mutate(e_academicdegree = ifelse(grade92==42,1,0))
+
+df <- df %>% mutate(r_white = ifelse(race==1,1,0))
+df <- df %>% mutate(r_blackf = ifelse(race==2,1,0))
+df <- df %>% mutate(r_asianf = ifelse(race==4,1,0))
+df <- df %>% mutate(r_otherf = ifelse(race!=1
+                                      & race!=2
+                                      & race!=4,1,0))
+
+df <- df %>% mutate(s_malef = ifelse(sex==1,1,0))
+df <- df %>% mutate(s_femalef = ifelse(sex==2,1,0))
+
+df <- df %>% mutate(m_marriedf = ifelse(marital==1,1,0))
+df <- df %>% mutate(m_divorcedf = ifelse(marital==5,1,0))
+df <- df %>% mutate(m_nevermarriedf = ifelse(marital==7,1,0))
+df <- df %>% mutate(m_otherf = ifelse(marital==3
+                                      | marital==4 
+                                      | marital==6,1,0))
+
+df <- df %>% mutate(unionf=ifelse(unionmme=="Yes",1,0))
+
+
+df <- df %>% mutate(agesq = age^2, agecu = age^3)
+
 ```
+
+* Target Variable (Y): Hourly wage
+* Predictor variables (X): Education (High school graduate as base), Race (White as base), Age, Sex (Male as base), Marital Status (Married as base), Union Status (Not in union as base)
+
+```{r, echo=FALSE}
+model1 <- as.formula(earnho ~ age + agesq)
+
+model2 <- as.formula(earnho ~ age + agesq + sex)
+
+model3 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf 
+                     + m_nevermarriedf + m_otherf)
+
+model4 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf 
+                     + m_nevermarriedf + m_otherf + r_blackf + r_asianf
+                     + r_otherf + e_collegedrop + e_occupationdegree 
+                     + e_academicdegree)
+
+model5 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf
+                     + m_nevermarriedf + m_otherf + r_blackf + r_asianf
+                     + r_otherf + e_collegedrop + e_occupationdegree 
+                     + e_academicdegree + agecu + age*s_femalef + age*unionf)
+
+reg1 <- feols(model1, data=df, vcov = 'hetero')
+reg2 <- feols(model2, data=df, vcov = 'hetero')
+reg3 <- feols(model3, data=df, vcov = 'hetero')
+reg4 <- feols(model4, data=df, vcov = 'hetero')
+reg5 <- feols(model5, data=df, vcov = 'hetero')
+
+```
+```{r, echo=FALSE}
+k <- 4
+
+set.seed(1)
+cv1 <- train(model1, df, method = "lm", trControl = trainControl(method = "cv", number = k))
+
+cv1
+summary(cv1)
+cv1$results
+cv1$resample
+
+set.seed(1)
+cv2 <- train(model2, df, method = "lm", trControl = trainControl(method = "cv", number = k))
+set.seed(1)
+cv3 <- train(model3, df, method = "lm", trControl = trainControl(method = "cv", number = k), na.action = "na.omit")
+set.seed(1)
+cv4 <- train(model4, df, method = "lm", trControl = trainControl(method = "cv", number = k), na.action = "na.omit")
+set.seed(1)
+cv5 <- train(model5, df, method = "lm", trControl = trainControl(method = "cv", number = k), na.action = "na.omit")
+```
+
+```{r, echo=FALSE}
+cv <- c("cv1", "cv2", "cv3", "cv4", "cv5")
+rmse_cv <- c()
+
+for(i in 1:length(cv)){
+  rmse_cv[i] <- sqrt((get(cv[i])$resample[[1]][1]^2 +
+                       get(cv[i])$resample[[1]][2]^2 +
+                       get(cv[i])$resample[[1]][3]^2 +
+                       get(cv[i])$resample[[1]][4]^2)/4)
+}
+
+
+# summarize results
+cv_mat <- data.frame(rbind(cv1$resample[4], "Average"),
+           rbind(cv1$resample[1], rmse_cv[1]),
+           rbind(cv2$resample[1], rmse_cv[2]),
+           rbind(cv3$resample[1], rmse_cv[3]),
+           rbind(cv4$resample[1], rmse_cv[4]),
+           rbind(cv5$resample[1], rmse_cv[5])
+           )
+
+colnames(cv_mat)<-c("Resample","Model1", "Model2", "Model3", "Model4", "Model5")
+cv_mat
+
+m_comp <- c()
+models <- c("reg1", "reg2", "reg3", "reg4", "reg5")
+for( i in 1 : length(cv) ){
+  m_comp[ i ] <- length( get( models[i] )$coefficient  - 1 ) 
+}
+
+m_comp <- tibble( model = models , 
+                  complexity = m_comp,
+                  RMSE = rmse_cv )
+
+ggplot( m_comp , aes( x = complexity , y = RMSE ) ) +
+  geom_point(color='red',size=2) +
+  geom_line(color='blue',size=0.5)+
+  labs(x='Number of explanatory variables',y='Averaged RMSE on test samples',
+       title='Prediction performance and model compexity') +
+  theme_bw()
+```
+
+
+
+```{r, echo=FALSE}
+ggplot(df, aes(earnho)) +
+  geom_histogram() +
+  theme_bw() +
+  labs(title = "Histogram of Hourly Wage", x = "", y = "")
+
+ggplot(df, aes(grade92)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Job types", x = "", y = "")
+
+ggplot(df, aes(grade92)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Education Levels", x = "", y = "")
+
+ggplot(df, aes(grade92)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Education Levels", x = "", y = "")
+
+```
+\newpage
+
+# Evaluation of the models using all the sample
+```{r, echo}
+fitstat_register("k", function(x){length( x$coefficients ) - 1}, "No. Variables")
+etable( reg1 , reg2 , reg3 , reg4 , reg5 , fitstat = c('aic','bic','rmse','r2','n','k') )%>% kable()
+```
+
