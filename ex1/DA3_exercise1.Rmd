@@ -77,8 +77,8 @@ df <- df %>% mutate(m_otherf = ifelse(marital==3
                                       | marital==4 
                                       | marital==6,1,0))
 
-df <- df %>% mutate(unionf=ifelse(unionmme=="Yes",1,0))
-
+df <- df %>% mutate(u_yesf=ifelse(unionmme=="Yes",1,0))
+df <- df %>% mutate(u_nof=ifelse(unionmme=="No",1,0))
 
 df <- df %>% mutate(agesq = age^2, agecu = age^3)
 
@@ -90,20 +90,20 @@ df <- df %>% mutate(agesq = age^2, agecu = age^3)
 ```{r, echo=FALSE}
 model1 <- as.formula(earnho ~ age + agesq)
 
-model2 <- as.formula(earnho ~ age + agesq + sex)
+model2 <- as.formula(earnho ~ age + agesq + s_femalef)
 
-model3 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf 
+model3 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf 
                      + m_nevermarriedf + m_otherf)
 
-model4 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf 
+model4 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf 
                      + m_nevermarriedf + m_otherf + r_blackf + r_asianf
                      + r_otherf + e_collegedrop + e_occupationdegree 
                      + e_academicdegree)
 
-model5 <- as.formula(earnho ~ age + agesq + s_femalef + unionf + m_divorcedf
+model5 <- as.formula(earnho ~ age + agesq + s_femalef + u_yesf + m_divorcedf
                      + m_nevermarriedf + m_otherf + r_blackf + r_asianf
                      + r_otherf + e_collegedrop + e_occupationdegree 
-                     + e_academicdegree + agecu + age*s_femalef + age*unionf)
+                     + e_academicdegree + agecu + age*s_femalef + age*u_yesf)
 
 reg1 <- feols(model1, data=df, vcov = 'hetero')
 reg2 <- feols(model2, data=df, vcov = 'hetero')
@@ -199,11 +199,38 @@ ggplot(df, aes(grade92)) +
   labs(title = "Histogram of the Education Levels", x = "", y = "")
 
 ```
+```{r, echo=FALSE}
+cv_mat %>% kable()
+```
+With 5-fold cross validation Model 3 has the best RMSE 
+
 \newpage
 
 # Evaluation of the models using all the sample
-```{r, echo}
+```{r, echo=FALSE}
+varname_report <- c("(Intercept)" = "Intercept",
+                   "agesq" = "age squared",
+                   "s_femalef" = "female",
+                   "u_yesf" = "unionized",
+                   "m_divorcedf" = "divorced",
+                   "m_nevermarriedf" = "never married",
+                   "m_otherf" = "other marital status",
+                   "r_blackf" = "black",
+                   "r_asianf" = "asian",
+                   "r_otherf" = "other race",
+                   "e_collegedrop" = "college drop-out",
+                   "e_occupationdegree" = "occupational degree",
+                   "e_academicdegree" = "academic degree",
+                   "agecu" = "age cubed",
+                   "m_otherf" = "other marital status",
+                   "age x s_femalef" = "age x female",
+                   "age x u_yesf" = "age x unionized")
 fitstat_register("k", function(x){length( x$coefficients ) - 1}, "No. Variables")
-etable( reg1 , reg2 , reg3 , reg4 , reg5 , fitstat = c('aic','bic','rmse','r2','n','k') )%>% kable()
+etable( reg1 , reg2 , reg3 , reg4 , reg5 ,
+        fitstat = c('aic','bic','rmse','r2','n','k'),
+        title = "Model Evaluation",
+        se.below = T,
+        dict = varname_report
+        )%>% kable()
 ```
-
+According to BIC, Model 3 is the best. According to RMSE Model 5 is the best.
