@@ -1,13 +1,13 @@
 ---
-title: "DA3 Exercise1"
-author: "Peter Kaiser"
+title: \vspace{-0.75cm} DA3 Exercise1
+author: Peter Kaiser
 date: '2022 01 23 '
 output: pdf_document
 ---
 
-#Introduction
+# Introduction
 
-
+This is a report about building models to predict the hourly wage of the driving jobs with multiple predictor variables in the cps data set. In the end we horse race the models to see which is the best one. It checks the BIC and the RMSE on the whole data set and the RMSE with 4 fold cross validation.
 
 ```{r, echo=FALSE, message=FALSE}
 # setup and data import
@@ -17,6 +17,8 @@ library(fixest)
 library(caret)
 library(knitr)
 library(kableExtra)
+library(egg)
+
 
 df_all <- read_csv("https://osf.io/4ay9x/download")
 ```
@@ -77,9 +79,11 @@ df <- df %>% mutate(u_nof = ifelse(unionmme == "No", 1, 0))
 # higher power
 df <- df %>% mutate(agesq = age^2, agecu = age^3)
 ```
+# Data cleaning, Feature engineering
 
 * Target Variable (Y): Hourly wage
 * Predictor variables (X): Education (High school graduate as base), Race (White as base), Age, Sex (Male as base), Marital Status (Married as base), Union Status (Not in union as base)
+* For more information see in Appendix
 
 ```{r, echo=FALSE, message=FALSE}
 
@@ -111,6 +115,14 @@ reg3 <- feols(model3, data = df, vcov = "hetero")
 reg4 <- feols(model4, data = df, vcov = "hetero")
 reg5 <- feols(model5, data = df, vcov = "hetero")
 ```
+
+# Models
+
+* Model 1: age, age squared
+* Model 2: age, age squared, sex
+* Model 3: age, age squared, sex, union, marital status
+* Model 4: age, age squared, sex, union, marital status, race, education
+* Model 5: age, age squared, sex, union, marital status, race, education, interaction age and female, interaction with age and union 
 
 ```{r, echo=FALSE}
 
@@ -168,7 +180,7 @@ m_comp <- tibble(
   RMSE = rmse_cv
 )
 
-ggplot(m_comp, aes(x = complexity, y = RMSE)) +
+pcomp <- ggplot(m_comp, aes(x = complexity, y = RMSE)) +
   geom_point(color = "red", size = 2) +
   geom_line(color = "blue", size = 0.5) +
   labs(
@@ -177,30 +189,67 @@ ggplot(m_comp, aes(x = complexity, y = RMSE)) +
   ) +
   theme_bw()
 ```
-# Appendix
+\newpage
 
+# Appendix
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
-ggplot(df, aes(earnho)) +
-  geom_histogram() +
+p1 <- ggplot(df, aes(earnho)) +
+  geom_density() +
   theme_bw() +
-  labs(title = "Histogram of Hourly Wage", x = "", y = "")
+  labs(title = "Density of Hourly Wage", x = "", y = "")
 
-ggplot(df, aes(grade92)) +
+p2 <- ggplot(df, aes(grade92)) +
   geom_histogram(stat = "count") +
   theme_bw() +
   labs(title = "Histogram of the Job types", x = "", y = "")
 
-ggplot(df, aes(grade92)) +
+p3 <- ggplot(df, aes(race)) +
   geom_histogram(stat = "count") +
   theme_bw() +
-  labs(title = "Histogram of the Education Levels", x = "", y = "")
+  labs(title = "Histogram of the Races", x = "", y = "") +
+  scale_x_continuous(breaks = 1:7) +
+  xlim(1,7)
 
-ggplot(df, aes(grade92)) +
+p4 <- ggplot(df, aes(age)) +
+  geom_density() +
+  theme_bw() +
+  labs(title = "Density of the Ages", x = "", y = "")
+
+p5 <- ggplot(df, aes(sex)) +
   geom_histogram(stat = "count") +
   theme_bw() +
-  labs(title = "Histogram of the Education Levels", x = "", y = "")
+  labs(title = "Histogram of the Sexes", x = "", y = "") +
+  scale_x_continuous(breaks = 1:2)
+
+p6 <- ggplot(df, aes(marital)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Marital status", x = "", y = "") +
+  scale_x_continuous(breaks = 1:7)
+
+p7 <- ggplot(df, aes(unionmme)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Union Status", x = "", y = "")
+```
+
+## Distribution of the hourly wages
+
+```{r, echo=FALSE}
+p1
+```
+
+The distribution is normal with right long tail
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ggarrange(p2,p3,p4,p5,p6,p7)
+```
+\newpage
+
+```{r, echo=FALSE}
+pcomp
 ```
 
 ```{r, echo=FALSE}
