@@ -185,10 +185,15 @@ pcomp <- ggplot(m_comp, aes(x = complexity, y = RMSE)) +
   geom_line(color = "blue", size = 0.5) +
   labs(
     x = "Number of explanatory variables", y = "Averaged RMSE on test samples",
-    title = "Prediction performance and model compexity"
+    title = "Prediction performance and model complexity"
   ) +
   theme_bw()
 ```
+# Results
+
+From the model summary table we can see that on the complete data set is the best is Model 3 in BIC and Model 5 is the best in RMSE.
+With 4 fold cross validation Model 3 has the best average RMSE seen on the Prediction performance and model complexity plot and on the summary table. I would choose Model 3 for prediction, but the increase in variable count from Model 2 to Model 3 is maybe too much.
+
 \newpage
 
 # Appendix
@@ -203,7 +208,7 @@ p1 <- ggplot(df, aes(earnho)) +
 p2 <- ggplot(df, aes(grade92)) +
   geom_histogram(stat = "count") +
   theme_bw() +
-  labs(title = "Histogram of the Job types", x = "", y = "")
+  labs(title = "Histogram of the Education types", x = "", y = "")
 
 p3 <- ggplot(df, aes(race)) +
   geom_histogram(stat = "count") +
@@ -233,7 +238,35 @@ p7 <- ggplot(df, aes(unionmme)) +
   geom_histogram(stat = "count") +
   theme_bw() +
   labs(title = "Histogram of the Union Status", x = "", y = "")
+
+p8 <- ggplot(df, aes(occ2012)) +
+  geom_histogram(stat = "count") +
+  theme_bw() +
+  labs(title = "Histogram of the Job Types", x = "", y = "")
 ```
+## Data selection and cleaning
+
+I selected the driving occupations.
+
+I filtered with the same filter values as in class:
+
+* More than 20 hours worked a week
+* More than 0 dollars earned a week
+* Older than 24 years
+* Younger than 64 years
+
+I also filtered for better or equal education than BSc turns out, drivers do not usually have BSc Education.
+* Education between high school and Bsc (BSc not included).
+
+I choose the predictors: 
+
+* grade92 (Education) as I think education is always an important quality with jobs
+* race to see if there is bias towards white people
+* age as I think age is always an important quality with jobs
+* sex to see if there is a bias towards males
+* marital to see if there is a marital status that earns more than others
+* unionmme (Union status) I think this is a hot topic in the US. 
+
 
 ## Distribution of the hourly wages
 
@@ -241,11 +274,19 @@ p7 <- ggplot(df, aes(unionmme)) +
 p1
 ```
 
-The distribution is normal with right long tail
+The hourly wage distribution is close to normal with right long tail
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ggarrange(p2,p3,p4,p5,p6,p7)
 ```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+count(df, occ2012) %>% kable() %>% kable_styling(position = "center", latex_options = c("hold_position"))
+```
+
+
 \newpage
 
 ```{r, echo=FALSE}
@@ -260,11 +301,11 @@ cv_mat %>%
   kable_styling(latex_options = c("hold_position", "scale_down"))
 ```
 
-With 5-fold cross validation Model 3 has the best RMSE 
+With 4-fold cross validation Model 3 has the best RMSE 
 
 \newpage
 
-# Evaluation of the models using all the sample
+## Evaluation of the models using all the sample
 ```{r, echo=FALSE}
 
 # coeff table
@@ -302,4 +343,4 @@ etable(reg1, reg2, reg3, reg4, reg5,
   kable_styling(latex_options = c("hold_position", "scale_down"))
 ```
 
-According to BIC, Model 3 is the best. According to RMSE Model 5 is the best.
+According to BIC, Model 3 is the best. According to RMSE Model 5 is the best on the full data set
