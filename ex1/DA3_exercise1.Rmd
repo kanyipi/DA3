@@ -275,6 +275,7 @@ p1
 
 The hourly wage distribution is close to normal with right long tail
 
+# EDA
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 ggarrange(p2,p3,p4,p5,p6,p7)
 ```
