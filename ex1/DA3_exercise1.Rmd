@@ -210,23 +210,22 @@ p2 <- ggplot(df, aes(grade92)) +
   theme_bw() +
   labs(title = "Histogram of the Education types", x = "", y = "")
 
-p3 <- ggplot(df, aes(race)) +
+p3 <- ggplot(df %>% filter(race<7), aes(race)) +
   geom_histogram(stat = "count") +
   theme_bw() +
   labs(title = "Histogram of the Races", x = "", y = "") +
-  scale_x_continuous(breaks = 1:7) +
-  xlim(1,7)
+  scale_x_continuous(breaks = 0:7)
 
 p4 <- ggplot(df, aes(age)) +
   geom_density() +
   theme_bw() +
   labs(title = "Density of the Ages", x = "", y = "")
 
-p5 <- ggplot(df, aes(sex)) +
+p5 <- ggplot(df %>% mutate(sex=ifelse(sex==1,"Male","Female"))
+             , aes(sex)) +
   geom_histogram(stat = "count") +
   theme_bw() +
-  labs(title = "Histogram of the Sexes", x = "", y = "") +
-  scale_x_continuous(breaks = 1:2)
+  labs(title = "Histogram of the Sexes", x = "", y = "")
 
 p6 <- ggplot(df, aes(marital)) +
   geom_histogram(stat = "count") +
@@ -247,7 +246,6 @@ p8 <- ggplot(df, aes(occ2012)) +
 ## Data selection and cleaning
 
 I selected the driving occupations.
-
 I filtered with the same filter values as in class:
 
 * More than 20 hours worked a week
@@ -256,6 +254,7 @@ I filtered with the same filter values as in class:
 * Younger than 64 years
 
 I also filtered for better or equal education than BSc turns out, drivers do not usually have BSc Education.
+
 * Education between high school and Bsc (BSc not included).
 
 I choose the predictors: 
@@ -280,12 +279,17 @@ The hourly wage distribution is close to normal with right long tail
 ggarrange(p2,p3,p4,p5,p6,p7)
 ```
 
+Education codes: 39: High school graduate, diploma or GED, 40: Some college but no degree, 41: Associate degree -- occupational/vocational, 42: Associate degree -- academic program
+
+Race codes: 1: White, 2: Black, 4: Asian or Pacific Islander
+
+Marital codes: 1: Married civilian spouse present, 5: Divorced “ , 7: Never Married
 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 count(df, occ2012) %>% kable() %>% kable_styling(position = "center", latex_options = c("hold_position"))
 ```
-
+Job codes: 9210: Bus drivers, 9130: Driver/sales workers and truck drivers, 9140: Taxi drivers and chauffeurs
 
 \newpage
 
