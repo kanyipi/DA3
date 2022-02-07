@@ -16,6 +16,9 @@ data <- data %>% mutate( property_type =
                                                 ifelse(property_type == "Private room in residential home", "Room","Error")))),f_property_type = factor(property_type))
 datasummary(property_type ~ N + Percent(), data = data )
 
+data <- data %>%
+  mutate(
+    f_neighbourhood_cleansed = factor(neighbourhood_cleansed))
 
 data <- data %>%
   mutate(f_room_type = factor(room_type))
@@ -62,7 +65,7 @@ for (i in amenlist) {
   data[[i]]<-0
 }
 
-for (i in 88:752) {
+for (i in 89:753) {
   amenity <- colnames(data)[i]
   print(amenity)
   for (j in 1:nrow(data)) {
@@ -81,7 +84,7 @@ data <- datasafe
 write.csv(data,"amenityclean")
 
 delete_ind = list()
-for (i in 88:752) {
+for (i in 89:753) {
   if (sum(data[,i])<300) {
    delete_ind <- append(delete_ind, i)
   }
@@ -89,11 +92,11 @@ for (i in 88:752) {
 
 data <- data[-unlist(delete_ind)]
 
-data <- data[-156]
+data <- data[-157]
 
 write.csv(data,"amenitycleanfilt")
 
-dummies <- names(data)[seq(88,167)]
+dummies <- names(data)[seq(89,168)]
 data <- data %>%
   mutate_at(vars(dummies), funs("d"= (.)))
 # rename columns
@@ -110,8 +113,6 @@ datanum<-data[ , nums]
 datanotnum <- data[ , notnumsid]
 datanum<-as.data.frame(do.call(cbind,by(t(datanum),INDICES=names(datanum),FUN=colSums)))
 data <- merge(datanum,datanotnum, by = "id")
-
-data
 
 data <- data %>%
   select(matches("^d_.*|^n_.*|^f_.*|^p_.*|^usd_.*"), price, id,
