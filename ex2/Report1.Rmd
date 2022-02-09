@@ -1,3 +1,21 @@
+---
+title: "DA3 EX2"
+author: "peter kaiser"
+date: '2022 02 09 '
+output: pdf_document
+---
+
+
+## Airbnb price prediction for Manchester
+
+# Introduction
+
+The aim of this project to help a company that operates in Manchester and rents small and mid-size apartments to prize their units.
+The data is from http://insideairbnb.com/get-the-data.html and is from the 21st of December 2021. I built 5 different models and horseraced them to see which model performed the best.
+
+#
+
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 ################################
 # Predicting apartment prices  #
 #     with random forest       #
@@ -15,6 +33,7 @@ library(modelsummary)
 library(pdp)
 library(gbm)
 library(rattle)
+library(knitr)
 
 
 data_cleaning <- function() {
@@ -31,7 +50,7 @@ data <- data %>% mutate( property_type =
                                   ifelse(property_type == "Entire rental unit", "Rental Unit",
                                          ifelse(property_type == "Entire residential home", "Residental Unit",
                                                 ifelse(property_type == "Private room in residential home", "Room","Error")))),f_property_type = factor(property_type))
-datasummary(property_type ~ N + Percent(), data = data )
+
 
 data <- data %>%
   mutate(
@@ -96,9 +115,6 @@ for (i in 89:753) {
     }
   }
 }
-datasafe <- data
-data <- datasafe
-write.csv(data,"amenityclean")
 
 delete_ind = list()
 for (i in 89:753) {
@@ -110,8 +126,6 @@ for (i in 89:753) {
 data <- data[-unlist(delete_ind)]
 
 data <- data[-157]
-
-write.csv(data,"amenitycleanfilt")
 
 dummies <- names(data)[seq(89,168)]
 data <- data %>%
@@ -177,8 +191,8 @@ for (j in 1:56 ) data.table::set(data, which((data[[j]])==2), j, 1)
 
 
 # where do we have missing variables now?
-to_filter <- sapply(data, function(x) sum(is.na(x)))
-to_filter[to_filter > 0]
+#to_filter <- sapply(data, function(x) sum(is.na(x)))
+#to_filter[to_filter > 0]
 
 # what to do with missing values? 
 # 1. drop if no target
@@ -202,8 +216,8 @@ data <- data %>%
 
 # 3. drop columns when many missing not important
 
-to_filter <- sapply(data, function(x) sum(is.na(x)))
-to_filter[to_filter > 0]
+#to_filter <- sapply(data, function(x) sum(is.na(x)))
+#to_filter[to_filter > 0]
 
 
 # 4. Replace missing variables re reviews with zero, when no review + add flags
@@ -235,45 +249,39 @@ data <- data %>%
   )
 
 # Look at data
-datasummary( id ~ N , data = data )
-datasummary_skim( data , 'categorical' )
+#datasummary( id ~ N , data = data )
+#datasummary_skim( data , 'categorical' )
 
 
 # where do we have missing variables now?
-to_filter <- sapply(data, function(x) sum(is.na(x)))
-to_filter[to_filter > 0]
+#to_filter <- sapply(data, function(x) sum(is.na(x)))
+#to_filter[to_filter > 0]
 
 
 write_csv(data, "airbnb_manch.csv")
 }
 
-#########################################################################################
-#
-# PART I
-# Loading and preparing data ----------------------------------------------
-#
-#########################################################################################
+#data_cleaning()
+```
 
 
-
-# Used area
+```{r message = FALSE, warning = FALSE, echo = FALSE}
+# Load data
 data <- read_csv('airbnb_manch.csv') %>%
   mutate_if(is.character, factor) %>%
   filter(!is.na(price))
 
-# Sample definition and preparation ---------------------------------------
-
-# We focus on normal apartments, n<8
-data <- data %>% filter(n_accommodates < 6)
+# We focus on normal apartments, n<7
+data <- data %>% filter(n_accommodates < 7)
 
 
 # copy a variable - purpose later, see at variable importance
 data <- data %>% mutate(n_accommodates_copy = n_accommodates)
 
 # basic descr stat -------------------------------------------
-skimr::skim(data)
-datasummary(price~Mean+Median+P25+P75+N,data=data)
-datasummary( f_room_type + f_property_type ~ N + Percent() , data = data )
+#skimr::skim(data)
+#datasummary(price~Mean+Median+P25+P75+N,data=data)
+#datasummary( f_room_type + f_property_type ~ N + Percent() , data = data )
 
 # create train and holdout samples -------------------------------------------
 # train is where we do it all, incl CV
@@ -284,12 +292,12 @@ data_train <- data[train_indices, ]
 data_holdout <- data[-train_indices, ]
 
 # Check the number of observations
-dim(data_train)
-dim(data_holdout)
+# dim(data_train)
+# dim(data_holdout)
 
 # Define models: simpler -> extended
 
-# Basic Variables inc neighnourhood
+# Basic Variables inc neighborhood
 basic_vars <- c(
   "n_accommodates", "n_beds", "n_days_since",
   "f_property_type","f_room_type", "n_bathrooms",
@@ -303,11 +311,11 @@ reviews <- c("n_number_of_reviews", "flag_n_number_of_reviews" ,
 amenities <-  grep("^d_.*", names(data), value = TRUE)
 
 #interactions for the LASSO
-# from ch14
+# from 
 X1  <- c("n_accommodates*f_property_type",  "f_room_type*f_property_type",
          "f_room_type*d_hostgreetsyou", "d_backyard*f_property_type",
           "d_wifi*f_property_type", "d_tv*f_property_type")
-# with boroughs
+# with city parts
 X2  <- c("f_property_type*f_neighbourhood_cleansed", "f_room_type*f_neighbourhood_cleansed",
          "n_accommodates*f_neighbourhood_cleansed" )
 
@@ -341,7 +349,7 @@ tune_grid <- expand.grid(
 
 # simpler model for model - using random forest
 set.seed(1234)
-system.time({
+
   rf_model_1 <- train(
     formula(paste0("price ~", paste0(predictors_1, collapse = " + "))),
     data = data_train,
@@ -350,14 +358,12 @@ system.time({
     tuneGrid = tune_grid,
     importance = "impurity"
   )
-})
-rf_model_1
-# save( rf_model_1 , file = 'rf_model_1.RData' )
-# load(url('https://github.com/regulyagoston/BA21_Coding/blob/main/Class_3/data/rf_model_1.RData?raw=true'))
+
+#rf_model_1
 
 # more complicated model - using random forest
 set.seed(1234)
-system.time({
+
   rf_model_2 <- train(
     formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
     data = data_train,
@@ -366,24 +372,10 @@ system.time({
     tuneGrid = tune_grid,
     importance = "impurity"
   )
-})
-rf_model_2
-# save( rf_model_2 , file = 'rf_model_2.RData' )
-# load(url('https://github.com/regulyagoston/BA21_Coding/blob/main/Class_3/data/rf_model_2.RData?raw=true'))
 
 
-# auto tuning first - just takes too much time...
-#set.seed(1234)
-#system.time({
-#   rf_model_2auto <- train(
-#     formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
-#     data = data_train,
-#     method = "ranger",
-#     trControl = train_control,
-#     importance = "impurity"
-#   )
-#})
-#rf_model_2auto 
+#rf_model_2
+
 
 
 # evaluate random forests -------------------------------------------------
@@ -394,9 +386,11 @@ results <- resamples(
     model_2  = rf_model_2
   )
 )
-summary(results)
+#summary(results)
+```
 
 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 #########################################################################################
 #
 # PART III
@@ -428,19 +422,8 @@ rf_model_2_var_imp_df <-
 ##############################
 
 # to have a quick look
-plot(varImp(rf_model_2))
+#plot(varImp(rf_model_2))
 cutoff = 50
-ggplot(rf_model_2_var_imp_df[rf_model_2_var_imp_df$imp>cutoff,],
-       aes(x=reorder(varname, imp), y=imp_percentage)) +
-  geom_point(color='red', size=1.5) +
-  geom_segment(aes(x=varname,xend=varname,y=0,yend=imp_percentage), color='red', size=1) +
-  ylab("Importance (Percent)") +
-  xlab("Variable Name") +
-  coord_flip() +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  theme_bw() +
-  theme(axis.text.x = element_text(size=6), axis.text.y = element_text(size=6),
-        axis.title.x = element_text(size=6), axis.title.y = element_text(size=6))
 
 ##############################
 # 2) full varimp plot, top 10 only
@@ -456,8 +439,10 @@ ggplot(rf_model_2_var_imp_df[1:10,], aes(x=reorder(varname, imp), y=imp_percenta
   coord_flip() +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_bw()
+```
 
 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 ##############################
 # 2) varimp plot grouped
 ##############################
@@ -498,8 +483,10 @@ ggplot(rf_model_2_var_imp_grouped_df, aes(x=reorder(varname, imp), y=imp_percent
   # expand=c(0,0),
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   theme_bw()
+```
 
 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 #########################################################################################
 # Partial Dependence Plots -------------------------------------------------------
 #########################################################################################
@@ -515,10 +502,12 @@ pdp_n_acc %>%
   geom_line(color='red', size=1) +
   ylab("Predicted price") +
   xlab("Accommodates (persons)") +
-  scale_x_continuous(limit=c(1,7), breaks=seq(1,7,1))+
+  scale_x_continuous(limit=c(1,6), breaks=seq(1,6,1))+
   theme_bw()
+```
 
 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 # 2) Room type
 pdp_n_roomtype <- pdp::partial(rf_model_2, pred.var = "f_room_type", 
                                pred.grid = distinct_(data_holdout, "f_room_type"), 
@@ -530,7 +519,10 @@ pdp_n_roomtype %>%
   xlab("Room type") +
   scale_y_continuous(limits=c(60,120), breaks=seq(60,120, by=10)) +
   theme_bw()
+```
 
+
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 ####
 # Subsample performance: RMSE / mean(y) ---------------------------------------
 # NOTE  we do this on the holdout set.
@@ -538,64 +530,6 @@ pdp_n_roomtype %>%
 # ---- cheaper or more expensive flats - not used in book
 data_holdout_w_prediction <- data_holdout %>%
   mutate(predicted_price = predict(rf_model_2, newdata = data_holdout))
-
-
-
-######### create nice summary table of heterogeneity
-a <- data_holdout_w_prediction %>%
-  mutate(is_low_size = ifelse(n_accommodates <= 3, "small apt", "large apt")) %>%
-  group_by(is_low_size) %>%
-  dplyr::summarise(
-    rmse = RMSE(predicted_price, price),
-    mean_price = mean(price),
-    rmse_norm = RMSE(predicted_price, price) / mean(price)
-  )
-
-
-b <- data_holdout_w_prediction %>%
-  filter(f_neighbourhood_cleansed %in% c("Westminster", "Camden",
-                                         "Kensington and Chelsea", "Tower Hamlets",
-                                         "Hackney", "Newham")) %>%
-  group_by(f_neighbourhood_cleansed) %>%
-  dplyr::summarise(
-    rmse = RMSE(predicted_price, price),
-    mean_price = mean(price),
-    rmse_norm = rmse / mean_price
-  )
-
-c <- data_holdout_w_prediction %>%
-  filter(f_property_type %in% c("Apartment", "House")) %>%
-  group_by(f_property_type) %>%
-  dplyr::summarise(
-    rmse = RMSE(predicted_price, price),
-    mean_price = mean(price),
-    rmse_norm = rmse / mean_price
-  )
-
-
-d <- data_holdout_w_prediction %>%
-  dplyr::summarise(
-    rmse = RMSE(predicted_price, price),
-    mean_price = mean(price),
-    rmse_norm = RMSE(predicted_price, price) / mean(price)
-  )
-
-# Save output
-colnames(a) <- c("", "RMSE", "Mean price", "RMSE/price")
-colnames(b) <- c("", "RMSE", "Mean price", "RMSE/price")
-colnames(c) <- c("", "RMSE", "Mean price", "RMSE/price")
-d<- cbind("All", d)
-colnames(d) <- c("", "RMSE", "Mean price", "RMSE/price")
-
-line1 <- c("Type", "", "", "")
-line2 <- c("Apartment size", "", "", "")
-line3 <- c("Neighbourhood", "", "", "")
-
-result_3 <- rbind(line2, a, line1, c, line3, b, d) %>%
-  transform(RMSE = as.numeric(RMSE), `Mean price` = as.numeric(`Mean price`),
-            `RMSE/price` = as.numeric(`RMSE/price`))
-
-result_3
 
 
 #########################################################################################
@@ -609,14 +543,14 @@ result_3
 # using model B
 
 set.seed(1234)
-system.time({
+
   ols_model <- train(
     formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
     data = data_train,
     method = "lm",
     trControl = train_control
   )
-})
+
 
 ols_model_coeffs <-  ols_model$finalModel$coefficients
 ols_model_coeffs_df <- data.frame(
@@ -629,7 +563,7 @@ ols_model_coeffs_df <- data.frame(
 # using extended model w interactions
 
 set.seed(1234)
-system.time({
+
   lasso_model <- train(
     formula(paste0("price ~", paste0(predictors_E, collapse = " + "))),
     data = data_train,
@@ -638,7 +572,7 @@ system.time({
     tuneGrid =  expand.grid("alpha" = 1, "lambda" = seq(0.01, 0.25, by = 0.01)),
     trControl = train_control
   )
-})
+
 
 lasso_coeffs <- coef(
   lasso_model$finalModel,
@@ -654,7 +588,7 @@ regression_coeffs <- merge(ols_model_coeffs_df, lasso_coeffs_non_null, by = "var
 
 # CART with built-in pruning
 set.seed(1234)
-system.time({
+
   cart_model <- train(
     formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
     data = data_train,
@@ -662,11 +596,15 @@ system.time({
     tuneLength = 10,
     trControl = train_control
   )
-})
-cart_model
-# Showing an alternative for plotting a tree
-fancyRpartPlot(cart_model$finalModel, sub = "")
 
+#cart_model
+# Showing an alternative for plotting a tree
+
+fancyRpartPlot(cart_model$finalModel, sub = "")
+```
+
+
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 # GBM  -------------------------------------------------------
 # See more e.g.:
 #   http://uc-r.github.io/gbm_regression
@@ -678,20 +616,19 @@ gbm_grid <-  expand.grid(interaction.depth = 5, # complexity of the tree
 
 
 set.seed(1234)
-system.time({
-  gbm_model <- train(formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
+
+gbm_model <- train(formula(paste0("price ~", paste0(predictors_2, collapse = " + "))),
                      data = data_train,
                      method = "gbm",
                      trControl = train_control,
                      verbose = FALSE,
                      tuneGrid = gbm_grid)
-})
-gbm_model
-gbm_model$finalModel
-# save( gbm_model , file = 'gbm_model.RData' )
-# load(url('https://github.com/regulyagoston/BA21_Coding/blob/main/Class_3/data/gbm_model.RData?raw=true'))
+
+#gbm_model
+```
 
 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 ###
 # and get prediction rmse and add to next summary table
 # ---- compare these models
@@ -705,18 +642,22 @@ final_models <-
        "GBM"  = gbm_model)
 
 results <- resamples(final_models) %>% summary()
-results
+#results
+```
 
+
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 # Model selection is carried out on this CV RMSE
 result_4 <- imap(final_models, ~{
   mean(results$values[[paste0(.y,"~RMSE")]])
 }) %>% unlist() %>% as.data.frame() %>%
   rename("CV RMSE" = ".")
 
-result_4
+result_4 %>% kable()
+```
 
 
-
+```{r message = FALSE, warning = FALSE, echo = FALSE}
 # evaluate preferred model on the holdout set -----------------------------
 
 result_5 <- map(final_models, ~{
@@ -724,4 +665,7 @@ result_5 <- map(final_models, ~{
 }) %>% unlist() %>% as.data.frame() %>%
   rename("Holdout RMSE" = ".")
 
-result_5
+result_5 %>% kable()
+```
+
+

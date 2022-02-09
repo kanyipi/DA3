@@ -2,9 +2,10 @@ library(tidyverse)
 library(modelsummary)
 library(stringr)
 
-data <- read_csv('listings.csv')
 
 
+  
+data <- read_csv('https://raw.githubusercontent.com/kanyipi/DA3/main/ex2/listings.csv')
 
 data <- data %>%
   filter(property_type %in% c("Entire condominium (condo)", "Entire rental unit", "Entire residential home",
