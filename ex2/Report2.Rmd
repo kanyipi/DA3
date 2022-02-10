@@ -2,55 +2,14 @@
 title: "DA3 EX2"
 author: "Peter Kaiser"
 date: '2022 02 09 '
-output: pdf_document
+output: html_document
 ---
 
 
-## Airbnb price prediction for Manchester
-
-# Introduction
-
-The aim of this project to help a company that operates in Manchester and rents small and mid-size apartments to prize their units.
-The data is from http://insideairbnb.com/get-the-data.html and is from the 21st of December 2021. I built 5 different models and horse raced them to see which model performed the best.
-
-# Data 
-
-For Data Cleaning and munging, I filtered on the airbnbs, which were condos, residential units, rental units, and rooms. Filtered for size for 6 or less people. Removed the records, where the price was missing, or was more than 100 usd a night as I do not think that is in the range of the company. For other missing values, I imputed them or set them to 1 and flagged them.
-The impressive part was the amenities where I created a dummy variables for every amenity which was listed.
-I created every listed amenity in every listing, and added this list to the data and set the dummy to 1 if the record had that amenity. In the end I only kept the amenities which had at least 300 occurrences.
-I also created groups of the variables d_ for the dummies, f_ for factors and n_ for numerics.
-Some squares, cubes and logarithms were also added.
+## Airbnb price prediction for Manchester Technical Report
 
 
-# Models
-
-First I created a hold out set with 30% of the data. These are not used in creating the models just used during the final test even after that as the selection of the model should be done before that of the models they are to imitate new data not used before.
-
-And I created 3 set of predictor variables:
-
-* The basic: accommodates, beds, property type, room type, bathrooms, neighborhood
-
-* The advanced: The basic + amenities and reviews
-
-the extra set for lasso:
-
-* The extra: The advanced + interactions
-
-\newpage
-
-Models: 
-I used the same models we used in class.
-
-* Random forest with the basic set.
-* Random forest with the advanced set.
-* OLS with the advanced set
-* CART with the advanced set
-* LASSO with the extra set
-* GBM with the advanced set
-
-
-
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE, include=FALSE}
 ################################
 # Predicting apartment prices  #
 #     with random forest       #
@@ -70,9 +29,13 @@ library(gbm)
 library(rattle)
 library(knitr)
 library(egg)
+```
+# Data preparation
 
-data_cleaning <- function() {
-  
+Most of my decisions were in data preparation.
+First I filtered for properties which had these types: Entire condominium (condo), Entire rental unit, Entire residential home, Private room in residential home, I think this makes sense as most of the properties where in these categories, I left room in, because in my opinion in Manchester a lot of the houses can be broken rooms to let. Especially where I lived in the campus region. So maybe if a house earns less than by breaking it up to rooms, we should check that.
+Then I set the type of most of the variables, and the corresponding starting letter of the column.
+```{r message = FALSE, warning = FALSE, eval=FALSE}
 data <- read_csv('https://raw.githubusercontent.com/kanyipi/DA3/main/ex2/listings.csv')
 
 
@@ -121,6 +84,15 @@ data <- data %>%
   mutate(
     n_days_since = as.numeric(as.Date(calendar_last_scraped,format="%Y-%m-%d") -
                                 as.Date(first_review ,format="%Y-%m-%d")))
+```
+
+Then I convert the amenities from the list in a column to flags. This is done by listing every unique amenity into one list. Appending this list to the data frame as columns with the value of zero. Then going through the amenities new columns and if the old list column had that amenity set the dummy value to zero. I removed the rows where less than 300 was the sum this means it had less than 300 occurrences in the data Somehow there were still duplicate amenities. Where I merged the 2 columns with sum and removed one. Then were there were 2s (if it had 1 in both of the columns) I set it back to 1. 
+There are at least 2 mistakes in this code. First it is not very reproducible, if the amenities change even if one more is added, my code wont run.
+Secondly, I messed up the order of the deletion of columns based on the sum and the merge. I should have first merged 2 columns then set them to 2, then filtering for the sum. This may resulted in the deletion of an amenity which, had 300 occurrences, but not in one row.
+Lastly which is not an error, but there could have been some merging, if the some column names are close for example iron and flat iron, or maybe 24 inch tv and tv could have been groupped up. This is not an error, just out of the scope of this report.
+
+
+```{r message = FALSE, warning = FALSE, eval=FALSE}
 amenlist <- list()
 
 for (i in 1:nrow(data)) {
@@ -180,9 +152,16 @@ datanotnum <- data[ , notnumsid]
 datanum<-as.data.frame(do.call(cbind,by(t(datanum),INDICES=names(datanum),FUN=colSums)))
 data <- merge(datanum,datanotnum, by = "id")
 
+```
+
+Then I filtered on the letter tagged values and some other, filtered on price being less 1000, I think this price is not for a normal airbnb company, this is probably for the very rich people, comming for football games. Created some ln variables, and cut some variables into groups.
+
+```{r message = FALSE, warning = FALSE, eval=FALSE}
 data <- data %>%
   select(matches("^d_.*|^n_.*|^f_.*|^p_.*|^usd_.*"), price, id,
          neighbourhood_cleansed,room_type,property_type)
+
+
 
 
 #####################
@@ -216,15 +195,21 @@ data <- data %>%
 # Pool and categorize the number of minimum nights: 1,2,3, 3+
 data <- data %>%
   mutate(f_minimum_nights= cut(n_minimum_nights, c(1,2,3,max(data$n_minimum_nights)), labels=c(1,2,3), right = F))
+```
 
+
+Here I changed the infinitiess to Nans, and in the dummy column, the numbers bigger than 1 back to 1.
+
+```{r message = FALSE, warning = FALSE, eval=FALSE}
 # Change Infinite values with NaNs
 for (j in 1:ncol(data) ) data.table::set(data, which(is.infinite(data[[j]])), j, NA)
-for (j in 1:56 ) data.table::set(data, which((data[[j]])==2), j, 1)
+for (j in 1:56 ) data.table::set(data, which((data[[j]])>1), j, 1)
+```
 
+Here I checked the missing values, for the prices, I deleted them. For the others some of them got imputed with the mean, or an other variable and got a flag.
+I created some more ln and square and cubic variables, then saved down the data.
 
-#------------------------------------------------------------------------------------------------
-
-
+```{r message = FALSE, warning = FALSE, eval=FALSE}
 # where do we have missing variables now?
 #to_filter <- sapply(data, function(x) sum(is.na(x)))
 #to_filter[to_filter > 0]
@@ -294,13 +279,29 @@ data <- data %>%
 
 
 write_csv(data, "airbnb_manch.csv")
-}
 
-#data_cleaning()
 ```
 
+# Modeling
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+I filter for properties which can have 6 or less people as that is the goal of the report, created the train and holdout set.
+Next I create the various levels of variable sets:
+
+And I created 3 set of predictor variables:
+
+* The basic: accommodates, beds, property type, room type, bathrooms, neighborhood
+
+* The advanced: The basic + amenities and reviews
+
+the extra set for lasso:
+
+* The extra: The advanced + interactions
+
+Every model was trained by the advanced level, except for LASSO, which was trained on the extra, and the basic random forest, which was trained on the basic.
+
+Also a 5 fold cross validation was done. 
+
+```{r message = FALSE, warning = FALSE}
 # Load data
 data <- read_csv('airbnb_manch.csv') %>%
   mutate_if(is.character, factor) %>%
@@ -373,7 +374,13 @@ predictors_E <- c(basic_vars, reviews, amenities, X1,X2)
 train_control <- trainControl(method = "cv",
                               number = 5,
                               verboseIter = FALSE)
+```
 
+For modeling for random forest the rules were 8 variables were selected at each split. It used variance reduction, and each tree had 50 node minimum.
+Both of the models used the same rules, but the different variable set.
+For the variable importance graph I needed to set the cutoff percentage to 5 percent and still only a couple of variables hit the cutoff as seen in the 3 page report.
+
+```{r message = FALSE, warning = FALSE}
 # set tuning
 tune_grid <- expand.grid(
   .mtry = c(8),
@@ -422,10 +429,7 @@ results <- resamples(
   )
 )
 #summary(results)
-```
 
-
-```{r message = FALSE, warning = FALSE, echo = FALSE}
 #########################################################################################
 #
 # PART III
@@ -477,7 +481,7 @@ p1 <- ggplot(rf_model_2_var_imp_df[1:10,], aes(x=reorder(varname, imp), y=imp_pe
 ```
 
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 ##############################
 # 2) varimp plot grouped
 ##############################
@@ -519,8 +523,11 @@ p2 <- ggplot(rf_model_2_var_imp_grouped_df, aes(x=reorder(varname, imp), y=imp_p
   theme_bw()
 ```
 
+I chose to show the partial dependence of the random forest with the number of people, and the room type to see the difference in the rooms, whether it is good to split a property or not, and to see whether the people price relation is linear or not, but it is.
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+Also these were only showed because the random forest model had the best RMSEs.
+
+```{r message = FALSE, warning = FALSE}
 #########################################################################################
 # Partial Dependence Plots -------------------------------------------------------
 #########################################################################################
@@ -541,7 +548,7 @@ pacc<- pdp_n_acc %>%
 ```
 
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 # 2) Room type
 pdp_n_roomtype <- pdp::partial(rf_model_2, pred.var = "f_room_type", 
                                pred.grid = distinct_(data_holdout, "f_room_type"), 
@@ -555,8 +562,11 @@ proom<- pdp_n_roomtype %>%
   theme_bw()
 ```
 
+OLS model: is a normal oLS with lm method and the advanced variable set.
+LASSO: is a normal LASSO with glmnet method and the extra variable set.
+CART: is a normal CART with rpart method and the advanced variable set. I showed the tree generated the CART because it may show some interesting rules.
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 ####
 # Subsample performance: RMSE / mean(y) ---------------------------------------
 # NOTE  we do this on the holdout set.
@@ -630,11 +640,12 @@ set.seed(1234)
 #cart_model
 # Showing an alternative for plotting a tree
 
-#fancyRpartPlot(cart_model$finalModel, sub = "")
+fancyRpartPlot(cart_model$finalModel, sub = "")
 ```
 
+\ GBM model with the advanced variable set.
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 # GBM  -------------------------------------------------------
 # See more e.g.:
 #   http://uc-r.github.io/gbm_regression
@@ -657,8 +668,10 @@ gbm_model <- train(formula(paste0("price ~", paste0(predictors_2, collapse = " +
 #gbm_model
 ```
 
+Lastly some result presentation on the train set and on the holdout set it is nice while the basic set random forest dropped from the train test to the holdout test, the advanced did not, this could have happened maybe because, the basic forest may have overfitted.
+The graphs connected to the best model, the advanced random forest,
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 ###
 # and get prediction rmse and add to next summary table
 # ---- compare these models
@@ -675,9 +688,9 @@ results <- resamples(final_models) %>% summary()
 #results
 ```
 
-# Results
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+
+```{r message = FALSE, warning = FALSE}
 # Model selection is carried out on this CV RMSE
 result_4 <- imap(final_models, ~{
   mean(results$values[[paste0(.y,"~RMSE")]])
@@ -687,10 +700,10 @@ result_4 <- imap(final_models, ~{
 result_4 %>% kable()
 ```
 
-For the results we can see that the random forest and GBM did the best. Out of these the random forest with the advanced set did the best.
 
 
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+
+```{r message = FALSE, warning = FALSE}
 # evaluate preferred model on the holdout set -----------------------------
 
 result_5 <- map(final_models, ~{
@@ -701,27 +714,13 @@ result_5 <- map(final_models, ~{
 result_5 %>% kable()
 ```
 
-On the holdout set we can see that the random forest with the advanced set still did better than the others.
 
-\newpage
-
-# Random Forest
-
-Both of the best model results came from black box models, but the advanced random forest did a little better.
-I checked partial dependence of accommodates and Room Type.
-We can see that the price is in a linear relation with the number of persons, also that the a entire unit pays more than a room as maybe we expected it. In the appendix I included the partial importance of the variables and the grouped importance of variables. The most important variable groups are, property type, number of accommodates, room type, and neighborhood.
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 ggarrange(pacc,proom)
 ```
 
-# Conclusion
 
-In conclusion the best model we could use is the random forest model with the advanced variables, but all models are close in results. It is a black box model where we do not know the exact coefficients. About the external validity, this data was collected on the 21st of December, which maybe the holiday season so it may not be externally valid, also the molds have the Manchester city regions coded into them, so they are not usable for other cities. But i may be true that, more people cost more and that entire units cost more. In terms of the London models, the models were worse but that is maybe because of the lesser number of observations.
-\newpage
-
-# Appendix
-
-```{r message = FALSE, warning = FALSE, echo = FALSE}
+```{r message = FALSE, warning = FALSE}
 ggarrange(p1,p2)
 ```
 
